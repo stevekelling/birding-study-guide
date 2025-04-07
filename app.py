@@ -23,10 +23,12 @@ selected_macros = st.multiselect("Select Macro Region(s) (Optional)", all_macros
 # Dynamically filter states based on selected macro regions
 if selected_macros:
     filtered_states = sorted(region_df[region_df['Macro Region'].isin(selected_macros)]['State/Province'].dropna().unique().tolist())
+    default_states = filtered_states
 else:
     filtered_states = all_states
+    default_states = []
 
-selected_states = st.multiselect("Select State/Province(s) (Optional)", filtered_states)
+selected_states = st.multiselect("Select State/Province(s) (Optional)", filtered_states, default=default_states)
 
 # Dynamically filter display regions based on selected macro regions and states
 display_filter = region_df.copy()
@@ -37,8 +39,9 @@ if selected_states:
     display_filter = display_filter[display_filter['State/Province'].isin(selected_states)]
 
 filtered_display_regions = sorted(display_filter['Region Display Name'].dropna().unique().tolist())
+default_display_regions = filtered_display_regions if selected_states else []
 
-selected_display_regions = st.multiselect("Select Display Region(s) (Optional)", filtered_display_regions)
+selected_display_regions = st.multiselect("Select Display Region(s) (Optional)", filtered_display_regions, default=default_display_regions)
 
 # Apply filters to the main DataFrame
 filtered_df = region_df.copy()
