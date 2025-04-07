@@ -1,7 +1,7 @@
-# Birding Study Guide App - Multi-Region Version with Filters for Pre-Cleaned Data
-# ✅ Assumes pre-cleaned ABA checklist and multiple regional datasets
+# Birding Study Guide App - Multi-Region Version with Filters (Fixed Interaction)
+# ✅ Pre-cleaned ABA checklist and multiple regional datasets
 # ✅ Dynamic in-app table view with region selection
-# ✅ Optional filters by status (Common, Uncommon, Rare, etc.)
+# ✅ Persistent sidebar filters
 # ✅ Optional CSV export for power users
 
 import streamlit as st
@@ -49,23 +49,25 @@ def main():
 
     selected_region = st.selectbox("Select your region:", list(regions.keys()))
 
+    # --- Filter section (always visible) ---
+    st.sidebar.header("Filter your study guide")
+    status_options = ['Common', 'Fairly Common', 'Uncommon', 'Rare', 'Accidental', 'Absent']
+    selected_status = st.sidebar.multiselect(
+        "Select statuses to include:",
+        options=status_options,
+        default=['Common', 'Fairly Common', 'Uncommon', 'Rare']
+    )
+
     # Load data
     aba_df = load_aba('ABA_Checklist.csv')
     region_df = load_region_data(regions[selected_region])
 
-    if st.button("Generate Study Guide"):
-        study_guide_df = generate_study_guide(aba_df, region_df, selected_region)
+    if st.button("Generate Study Guide") or 'study_guide_df' in st.session_state:
+        if 'study_guide_df' not in st.session_state:
+            st.session_state.study_guide_df = generate_study_guide(aba_df, region_df, selected_region)
 
-        # --- Filter section ---
-        st.sidebar.header("Filter your study guide")
-        status_options = ['Common', 'Fairly Common', 'Uncommon', 'Rare', 'Accidental', 'Absent']
-        selected_status = st.sidebar.multiselect(
-            "Select statuses to include:",
-            options=status_options,
-            default=['Common', 'Fairly Common', 'Uncommon', 'Rare']
-        )
-
-        filtered_df = study_guide_df[study_guide_df[selected_region].isin(selected_status)]
+        # Apply filter
+        filtered_df = st.session_state.study_guide_df[st.session_state.study_guide_df[selected_region].isin(selected_status)]
 
         st.success(f"Study guide for {selected_region} generated!")
 
