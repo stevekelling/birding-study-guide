@@ -9,11 +9,7 @@ import pandas as pd
 
 # --- Load and clean ABA checklist ---
 def load_clean_aba(filepath):
-    aba_raw = pd.read_csv(filepath, header=None)
-    aba_clean = aba_raw.dropna(subset=[1])  # Drop rows where Common Name is NaN
-    aba_clean = aba_clean[aba_clean[3].notna()]  # Drop family/category rows (Scientific name is NaN)
-    aba_clean = aba_clean[[1, 3]]  # Keep only Common Name and Scientific Name
-    aba_clean.columns = ['Common Name', 'Scientific Name']
+    aba_clean = pd.read_csv(filepath)
     return aba_clean
 
 # --- Load and clean Washington eBird data ---
