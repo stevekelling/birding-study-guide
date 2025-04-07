@@ -1,92 +1,45 @@
-# Birding Study Guide App - Multi-Region Version with Fixed Session State
-# ✅ Pre-cleaned ABA checklist and multiple regional datasets
-# ✅ Dynamic in-app table view with region selection
-# ✅ Persistent sidebar filters
-# ✅ Optional CSV export for power users
-
 import streamlit as st
 import pandas as pd
 
-# --- Load ABA checklist (already clean) ---
-def load_aba(filepath):
-    return pd.read_csv(filepath)
+# Load your region mapping file
+@st.cache_data
+def load_region_mapping():
+    return pd.read_csv('region_mapping.csv', quotechar='"')
 
-# --- Load region data (already clean) ---
-def load_region_data(filepath):
-    return pd.read_csv(filepath)
+region_df = load_region_mapping()
 
-# --- Generate Study Guide ---
-def generate_study_guide(aba_df, region_df, region_name):
-    final_df = aba_df.merge(region_df, on='Common Name', how='left')
-    final_df[region_name] = final_df['Status'].fillna('Absent')
-    final_df.drop(columns=['Status'], inplace=True)
+st.title("Birding Study Guide — Region Selector")
 
-    # Add placeholders for other regions (optional)
-    all_regions = ['PNW', 'Arizona', 'Northern California', 'British Columbia', 'Idaho', 'California', 'Oregon']
-    for region in all_regions:
-        if region != region_name and region not in final_df.columns:
-            final_df[region] = 'Absent'
+st.markdown("### Filter regions independently by Macro Region, State/Province, or Region Name.")
 
-    final_df['Subregion Notes'] = f'Custom run for {region_name} region.'
-    return final_df
+# Get unique values for selectors
+macro_regions = sorted(region_df['Macro Region'].dropna().unique().tolist())
+states = sorted(region_df['State/Province'].dropna().unique().tolist())
+display_regions = sorted(region_df['Region Display Name'].dropna().unique().tolist())
 
-# --- Main App ---
-def main():
-    st.set_page_config(page_title="Birding Study Guide Generator", layout="wide")
+# Build multi-selectors
+selected_macros = st.multiselect("Select Macro Region(s) (Optional)", macro_regions)
+selected_states = st.multiselect("Select State/Province(s) (Optional)", states)
+selected_display_regions = st.multiselect("Select Display Region(s) (Optional)", display_regions)
 
-    st.title("🪶 Birding Study Guide Generator")
-    st.markdown("Prepare for your next birding adventure with a custom study guide! \n \n Select your target region to generate a tailored list.")
+# Apply filters independently
+filtered_df = region_df.copy()
 
-    # Region selection
-    regions = {
-        'Pacific Northwest (Washington)': 'Washington.csv',
-        'Oregon': 'Oregon.csv',
-        'Idaho': 'Idaho.csv',
-        'British Columbia': 'British Columbia.csv',
-        'California': 'California.csv',
-        'Arizona': 'Arizona.csv'
-    }
+if selected_macros:
+    filtered_df = filtered_df[filtered_df['Macro Region'].isin(selected_macros)]
 
-    selected_region = st.selectbox("Select your region:", list(regions.keys()))
+if selected_states:
+    filtered_df = filtered_df[filtered_df['State/Province'].isin(selected_states)]
 
-    # --- Filter section (always visible) ---
-    st.sidebar.header("Filter your study guide")
-    status_options = ['Common', 'Fairly Common', 'Uncommon', 'Rare', 'Accidental', 'Absent']
-    selected_status = st.sidebar.multiselect(
-        "Select statuses to include:",
-        options=status_options,
-        default=['Common', 'Fairly Common', 'Uncommon', 'Rare']
-    )
+if selected_display_regions:
+    filtered_df = filtered_df[filtered_df['Region Display Name'].isin(selected_display_regions)]
 
-    # Load data
-    aba_df = load_aba('ABA_Checklist.csv')
-    region_df = load_region_data(regions[selected_region])
+# Sort for clean display
+sort_columns = ["Macro Region", "State/Province", "Region Display Name", "County Name"]
+filtered_df = filtered_df.sort_values(by=sort_columns).reset_index(drop=True)
 
-    # Use region-specific session state key
-    session_key = f"study_guide_df_{selected_region.replace(' ', '_')}"
+# Show filtered results
+st.markdown("### Filtered Regions")
+st.dataframe(filtered_df)
 
-    if st.button("Generate Study Guide") or session_key in st.session_state:
-        if session_key not in st.session_state:
-            st.session_state[session_key] = generate_study_guide(aba_df, region_df, selected_region)
-
-        # Apply filter
-        filtered_df = st.session_state[session_key][st.session_state[session_key][selected_region].isin(selected_status)]
-
-        st.success(f"Study guide for {selected_region} generated!")
-
-        # Display dynamic table
-        st.subheader(f"Your Regional Study Guide: {selected_region}")
-        st.dataframe(filtered_df, use_container_width=True)
-
-        # Optional: Download button
-        csv = filtered_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="Download Study Guide as CSV",
-            data=csv,
-            file_name=f'Birding_Study_Guide_{selected_region.replace(" ", "_")}.csv',
-            mime='text/csv'
-        )
-
-# Run the app
-if __name__ == '__main__':
-    main()
+st.success(f"{len(filtered_df)} regions matching your filters.")
