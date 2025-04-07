@@ -1,6 +1,7 @@
-# Birding Study Guide App - Multi-Region Version for Pre-Cleaned Data
+# Birding Study Guide App - Multi-Region Version with Filters for Pre-Cleaned Data
 # ✅ Assumes pre-cleaned ABA checklist and multiple regional datasets
 # ✅ Dynamic in-app table view with region selection
+# ✅ Optional filters by status (Common, Uncommon, Rare, etc.)
 # ✅ Optional CSV export for power users
 
 import streamlit as st
@@ -54,14 +55,26 @@ def main():
 
     if st.button("Generate Study Guide"):
         study_guide_df = generate_study_guide(aba_df, region_df, selected_region)
+
+        # --- Filter section ---
+        st.sidebar.header("Filter your study guide")
+        status_options = ['Common', 'Fairly Common', 'Uncommon', 'Rare', 'Accidental', 'Absent']
+        selected_status = st.sidebar.multiselect(
+            "Select statuses to include:",
+            options=status_options,
+            default=['Common', 'Fairly Common', 'Uncommon', 'Rare']
+        )
+
+        filtered_df = study_guide_df[study_guide_df[selected_region].isin(selected_status)]
+
         st.success(f"Study guide for {selected_region} generated!")
 
         # Display dynamic table
         st.subheader(f"Your Regional Study Guide: {selected_region}")
-        st.dataframe(study_guide_df, use_container_width=True)
+        st.dataframe(filtered_df, use_container_width=True)
 
         # Optional: Download button
-        csv = study_guide_df.to_csv(index=False).encode('utf-8')
+        csv = filtered_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="Download Study Guide as CSV",
             data=csv,
