@@ -1,4 +1,4 @@
-# Birding Study Guide App - Multi-Region Version with Filters (Fixed Interaction)
+# Birding Study Guide App - Multi-Region Version with Fixed Session State
 # ✅ Pre-cleaned ABA checklist and multiple regional datasets
 # ✅ Dynamic in-app table view with region selection
 # ✅ Persistent sidebar filters
@@ -62,12 +62,15 @@ def main():
     aba_df = load_aba('ABA_Checklist.csv')
     region_df = load_region_data(regions[selected_region])
 
-    if st.button("Generate Study Guide") or 'study_guide_df' in st.session_state:
-        if 'study_guide_df' not in st.session_state:
-            st.session_state.study_guide_df = generate_study_guide(aba_df, region_df, selected_region)
+    # Use region-specific session state key
+    session_key = f"study_guide_df_{selected_region.replace(' ', '_')}"
+
+    if st.button("Generate Study Guide") or session_key in st.session_state:
+        if session_key not in st.session_state:
+            st.session_state[session_key] = generate_study_guide(aba_df, region_df, selected_region)
 
         # Apply filter
-        filtered_df = st.session_state.study_guide_df[st.session_state.study_guide_df[selected_region].isin(selected_status)]
+        filtered_df = st.session_state[session_key][st.session_state[session_key][selected_region].isin(selected_status)]
 
         st.success(f"Study guide for {selected_region} generated!")
 
