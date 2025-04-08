@@ -1,92 +1,97 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
 
-# Load your region mapping file
+# ================================
+# ✅ Config
+# ================================
+
+st.set_page_config(page_title="Birding Place Finder", layout="wide")
+
+# ================================
+# ✅ Load Data (cached for performance)
+# ================================
+
 @st.cache_data
-def load_region_mapping():
-    return pd.read_csv('region_mapping.csv', quotechar='"')
+def load_data():
+    # Load enriched places file
+    places = pd.read_csv("places_enriched.csv")
 
-# Load your place mapping file
-@st.cache_data
-def load_place_mapping():
-    return pd.read_csv('place_mapping.csv', quotechar='"')
+    # Load region mapping file
+    region_mapping = pd.read_csv("region_mapping.csv")
 
-region_df = load_region_mapping()
-place_df = load_place_mapping()
+    return places, region_mapping
 
-st.title("Birding Study Guide — Region Selector")
+places_df, region_mapping_df = load_data()
 
-st.markdown("### Use the helper below to start with a familiar place, or manually filter regions.")
+# ================================
+# ✅ UI Header
+# ================================
 
-# Build place lookup dictionary
-place_options = ["(Skip)"] + sorted(place_df['Place Name'].dropna().unique().tolist())
-selected_place = st.selectbox("Where are you visiting? (Optional)", place_options)
+st.title("🦉 Birding Place Finder")
+st.subheader("Search for birding places and explore their ecological regions")
 
-# Initialize pre-selected filters
-pre_selected_macros = []
-pre_selected_states = []
-pre_selected_display_regions = []
+# ================================
+# ✅ User Input: Place Name with Autosuggest
+# ================================
 
-if selected_place != "(Skip)":
-    selected_region_id = place_df.loc[place_df['Place Name'] == selected_place, 'Region ID'].values[0]
-    
-    # Use region_mapping.csv to get full region details
-    region_details = region_df.loc[region_df['Region ID'] == selected_region_id].iloc[0]
+# Build list of unique place names for suggestions
+place_names = places_df['Place'].dropna().unique().tolist()
 
-    pre_selected_macros = [region_details['Macro Region']]
-    pre_selected_states = [region_details['State/Province']]
-    pre_selected_display_regions = [region_details['Region Display Name']]
+selected_place = st.selectbox("Type or select a place:", options=sorted(place_names))
 
-    st.info(f"Auto-selected: **{region_details['Macro Region']}** → **{region_details['State/Province']}** → **{region_details['Region Display Name']}**")
+if selected_place:
+    # ================================
+    # ✅ Lookup place details
+    # ================================
 
-# Dynamic multi-select filters
+    place_row = places_df[places_df['Place'] == selected_place].iloc[0]
 
-# Get full lists
-all_macros = sorted(region_df['Macro Region'].dropna().unique().tolist())
-all_states = sorted(region_df['State/Province'].dropna().unique().tolist())
-all_display_regions = sorted(region_df['Region Display Name'].dropna().unique().tolist())
+    st.markdown(f"### 📍 **{selected_place}**")
+    st.write(f"- **State:** {place_row['State']}")
+    st.write(f"- **County:** {place_row['County Name']}")
+    st.write(f"- **Latitude / Longitude:** {place_row['Latitude']}, {place_row['Longitude']}")
+    st.write(f"- **Region ID:** {place_row['Region ID']}")
 
-# Macro Region selection
-selected_macros = st.multiselect("Select Macro Region(s) (Optional)", all_macros, default=pre_selected_macros)
+    # ================================
+    # ✅ Lookup region mapping details
+    # ================================
 
-# Filter states based on Macro Region
-if selected_macros:
-    filtered_states = sorted(region_df[region_df['Macro Region'].isin(selected_macros)]['State/Province'].dropna().unique().tolist())
-else:
-    filtered_states = all_states
+    region_id = place_row['Region ID']
+    region_row = region_mapping_df[region_mapping_df['Region ID'] == region_id]
 
-selected_states = st.multiselect("Select State/Province(s) (Optional)", filtered_states, default=pre_selected_states)
+    if not region_row.empty:
+        region_info = region_row.iloc[0]
+        st.markdown("### 🌎 **Region Details**")
+        st.write(f"- **Region Name:** {region_info['Region Display Name']}")
+        st.write(f"- **Macro Region:** {region_info['Macro Region']}")
+        st.write(f"- **Country:** {region_info['Country']}")
+        st.write(f"- **State / Province:** {region_info['State/Province']}")
+        st.write(f"- **Notes:** {region_info.get('Notes / Description', '—')}")
+        st.write(f"- **BCR Number(s):** {region_info.get('BCR Number(s)', '—')}")
+        st.write(f"- **Flagship Species:** {region_info.get('Flagship Species', '—')}")
+        st.write(f"- **Seasonality Focus:** {region_info.get('Seasonality Focus / Special Field Notes', '—')}")
 
-# Filter display regions based on previous selections
-display_filter = region_df.copy()
+    else:
+        st.warning("⚠️ Region mapping details not found for this Region ID.")
 
-if selected_macros:
-    display_filter = display_filter[display_filter['Macro Region'].isin(selected_macros)]
-if selected_states:
-    display_filter = display_filter[display_filter['State/Province'].isin(selected_states)]
+    # ================================
+    # ✅ Optional: Show raw data expander
+    # ================================
 
-filtered_display_regions = sorted(display_filter['Region Display Name'].dropna().unique().tolist())
+    with st.expander("See raw place data"):
+        st.dataframe(place_row.to_frame())
 
-selected_display_regions = st.multiselect("Select Display Region(s) (Optional)", filtered_display_regions, default=pre_selected_display_regions)
+    with st.expander("See raw region mapping data"):
+        if not region_row.empty:
+            st.dataframe(region_row)
+        else:
+            st.write("No data available.")
 
-# Apply filters to main DataFrame
-filtered_df = region_df.copy()
+# ================================
+# ✅ Footer
+# ================================
 
-if selected_macros:
-    filtered_df = filtered_df[filtered_df['Macro Region'].isin(selected_macros)]
-
-if selected_states:
-    filtered_df = filtered_df[filtered_df['State/Province'].isin(selected_states)]
-
-if selected_display_regions:
-    filtered_df = filtered_df[filtered_df['Region Display Name'].isin(selected_display_regions)]
-
-# Sort for clean display
-sort_columns = ["Macro Region", "State/Province", "Region Display Name", "County Name"]
-filtered_df = filtered_df.sort_values(by=sort_columns).reset_index(drop=True)
-
-# Show results
-st.markdown("### Filtered Regions")
-st.dataframe(filtered_df)
-
-st.success(f"{len(filtered_df)} regions matching your filters.")
+st.markdown("---")
+st.markdown("Built for personalized birding study — powered by pre-enriched data 🦉")
